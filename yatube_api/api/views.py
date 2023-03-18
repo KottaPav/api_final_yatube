@@ -1,11 +1,9 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import filters, mixins, status, viewsets
-from rest_framework.exceptions import ValidationError
+from rest_framework import filters, mixins, viewsets
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import (IsAuthenticatedOrReadOnly,
                                         IsAuthenticated,
                                         )
-from rest_framework.response import Response
 
 from .permissions import IsAuthorOrReadOnlyPermission
 from .serializers import (CommentSerializer,
@@ -14,7 +12,7 @@ from .serializers import (CommentSerializer,
                           PostSerializer
                           )
 
-from posts.models import Follow, Group, Post
+from posts.models import Group, Post
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -27,12 +25,8 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         post = get_object_or_404(Post, pk=self.kwargs.get('post_id'))
-        if not self.request.user:
-            raise ValidationError(
-                'Только зарегистрированные пользователи '
-                'могут отправлять сообщения.'
-            )
-        serializer.save(author=self.request.user, post=post)
+        if self.permission_classes:
+            serializer.save(author=self.request.user, post=post)
 
 
 class GroupViewSet(viewsets.ReadOnlyModelViewSet):
@@ -40,28 +34,11 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = GroupSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
-    def retrieve(self, request, *args, **kwargs):
-        if not request.user:
-            return Response(
-                {'detail': 'Зарегистрируйтесь или войдите на сайт.'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        return super().retrieve(request, *args, **kwargs)
-
-    def list(self, request, *args, **kwargs):
-        if not request.user:
-            return Response(
-                {'detail': 'Зарегистрируйтесь или войдите на сайт.'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        return super().list(request, *args, **kwargs)
-
 
 class FollowViewSet(mixins.CreateModelMixin,
                     mixins.ListModelMixin,
                     viewsets.GenericViewSet
                     ):
-    queryset = Follow.objects.all()
     serializer_class = FollowSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
@@ -82,9 +59,5 @@ class PostViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthorOrReadOnlyPermission]
 
     def perform_create(self, serializer):
-        if not self.request.user:
-            raise ValidationError(
-                'Только зарегистрированные пользователи '
-                'могут отправлять сообщения.'
-            )
-        serializer.save(author=self.request.user)
+        if self.permission_classes:
+            serializer.save(author=self.request.user)
